@@ -18,29 +18,23 @@ export default class Repository extends Component {
     repository: {},
     issues: [],
     loading: true,
-    filter: 'all',
+    filter: ['all', 'open', 'closed'],
     page: 1,
+    active: 0,
+    activePage: false,
   };
 
-  componentDidMount() {
-    this.loadList();
-  }
-
-  // componentDidUpdate(){
-  //  this.loadList();
-  // }
-
-  loadList = async (filter, page) => {
-    this.setState({ loading: true, filter });
+  async componentDidMount() {
     const { match } = this.props;
+    const { filter } = this.state;
 
     const repoName = decodeURIComponent(match.params.repository);
 
     const [repository, issues] = await Promise.all([
       api.get(`/repos/${repoName}`),
-      api.get(`/repos/${repoName}/issues?page=${this.state.page}${page}${1}`, {
+      api.get(`/repos/${repoName}/issues`, {
         params: {
-          state: filter,
+          state: filter[0],
           per_page: 5,
         },
       }),
@@ -51,12 +45,54 @@ export default class Repository extends Component {
       issues: issues.data,
       loading: false,
     });
+  }
 
-    console.log(`result = ${this.state.page}${page}${1}`);
+  loadList = async index => {
+    try {
+      await this.setState({ active: index, loading: true });
+      const { page, active, filter } = this.state;
+
+      const { match } = this.props;
+
+      const repoName = decodeURIComponent(match.params.repository);
+
+      const [repository, issues] = await Promise.all([
+        api.get(`/repos/${repoName}`),
+        api.get(`/repos/${repoName}/issues`, {
+          params: {
+            state: filter[active],
+            per_page: 10,
+            page,
+          },
+        }),
+      ]);
+
+      if (issues.data == '') {
+        throw new Error('sem dados');
+      }
+
+      this.setState({
+        repository: repository.data,
+        issues: issues.data,
+        loading: false,
+      });
+    } catch (error) {
+      console.log(error.message);
+      this.setState({ loading: false });
+    }
+  };
+
+  handlePage = async op => {
+    const { page, active } = this.state;
+
+    await this.setState({
+      page: op === 'next' ? page + 1 : page - 1,
+    });
+    this.loadList(active);
   };
 
   render() {
-    const { repository, issues, loading, page, filter } = this.state;
+    const { repository, issues, loading, activePage } = this.state;
 
     if (loading) {
       return <Loading>Carregando</Loading>;
@@ -72,17 +108,17 @@ export default class Repository extends Component {
         <Filter>
           <div>
             <div>
-              <h4>Filter by</h4>
+              <h4>Filtrar por</h4>
             </div>
             <div>
-              <button type="button" onClick={() => this.loadList('all', '')}>
-                ALL
+              <button type="button" onClick={() => this.loadList(0)}>
+                TODOS
               </button>
-              <button type="button" onClick={() => this.loadList('open', '')}>
-                OPEN
+              <button type="button" onClick={() => this.loadList(1)}>
+                ABERTOS
               </button>
-              <button type="button" onClick={() => this.loadList('closed', '')}>
-                CLOSED
+              <button type="button" onClick={() => this.loadList(2)}>
+                FECHADOS
               </button>
             </div>
           </div>
@@ -106,22 +142,22 @@ export default class Repository extends Component {
         <Filter>
           <div>
             <div>
-              {page > 1 && (
-                <button
-                  type="button"
-                  onClick={() => this.loadList(filter, '-')}
-                >
-                  anterior
-                </button>
-              )}
-              {page !== 0 && (
-                <button
-                  type="button"
-                  onClick={() => this.loadList(filter, '+')}
-                >
-                  Próximo
-                </button>
-              )}
+              <button
+                disabled={activePage}
+                page={activePage}
+                type="button"
+                onClick={() => this.handlePage('previous')}
+              >
+                Anterior
+              </button>
+              <button
+                page={activePage}
+                disabled={activePage}
+                type="button"
+                onClick={() => this.handlePage('next')}
+              >
+                Próximo
+              </button>
             </div>
           </div>
         </Filter>

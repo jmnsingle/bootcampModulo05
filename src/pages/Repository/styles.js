@@ -63,6 +63,11 @@ export const Filter = styled.div`
   button:hover {
     opacity: 0.6;
   }
+
+  &[disabled] {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 `;
 
 export const IssueList = styled.ul`
